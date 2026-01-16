@@ -1,0 +1,92 @@
+---
+- name: Déploiement Rapide avec Git Clone
+  hosts: all
+  become: yes
+  vars:
+    app_directory: /home/{{ ansible_user }}/stayava-hotel
+    repo_url: "https://github.com/Quentin693/CI-CDproject.git"
+    
+  tasks:
+    # 1. Installer les outils nécessaires
+    - name: 📦 Installer git et curl
+      apt:
+        name:
+          - git
+          - curl
+        state: present
+        update_cache: yes
+    
+    # 2. Installer Node.js via NodeSource
+    - name: 🔧 Télécharger le script d'installation Node.js
+      shell: curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+    
+    - name: 📦 Installer Node.js
+      apt:
+        name: nodejs
+        state: present
+        update_cache: yes
+    
+    # 3. Supprimer l'ancien répertoire si existe
+    - name: 🧹 Nettoyer l'ancien déploiement
+      file:
+        path: "{{ app_directory }}"
+        state: absent
+      become_user: "{{ ansible_user }}"
+    
+    # 4. Cloner le repo depuis GitHub (RAPIDE!)
+    - name: 📥 Cloner le repository depuis GitHub
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_directory }}"
+        version: main
+        force: yes
+      become_user: "{{ ansible_user }}"
+    
+    # 5. Installer les dépendances
+    - name: 📦 Installation des dépendances
+      command: npm install
+      args:
+        chdir: "{{ app_directory }}"
+      become_user: "{{ ansible_user }}"
+    
+    # 6. Build
+    - name: 🏗️ Build de l'application
+      command: npm run build
+      args:
+        chdir: "{{ app_directory }}"
+      environment:
+        NEXT_TELEMETRY_DISABLED: "1"
+      become_user: "{{ ansible_user }}"
+    
+    # 7. Arrêter les anciens processus
+    - name: 🛑 Arrêter les anciens processus
+      shell: |
+        pkill -f "npm.*start" || true
+        pkill -f "node.*next.*start" || true
+      become_user: "{{ ansible_user }}"
+      ignore_errors: yes
+    
+    # 8. Démarrer l'app
+    - name: 🚀 Démarrer l'application
+      shell: |
+        cd {{ app_directory }}
+        nohup npm start > /tmp/stayava.log 2>&1 &
+        sleep 3
+      become_user: "{{ ansible_user }}"
+    
+    # 9. Vérifier
+    - name: ✅ Vérifier que l'app répond
+      uri:
+        url: "http://localhost:3000"
+        status_code: 200
+      retries: 10
+      delay: 3
+      register: result
+      until: result.status == 200
+    
+    - name: 🎉 Succès !
+      debug:
+        msg: "🎉 Application déployée ! Accessible sur http://{{ ansible_host }}:3000"
+
