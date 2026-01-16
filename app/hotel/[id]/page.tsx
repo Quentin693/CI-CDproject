@@ -27,7 +27,7 @@ export default function HotelDetailPage({ params }: { params: { id: string } }) 
             className="flex items-center gap-2 hover:text-gray-300 transition w-fit"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span>Retour à l'accueil</span>
+            <span>Retour aux hôtels</span>
           </Link>
         </div>
       </div>
