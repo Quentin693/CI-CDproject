@@ -11,7 +11,7 @@ export default function ConfidenceSection() {
     {
       number: '02',
       title: 'Experienced Agent',
-      description: 'Find a customer agent who knows your market best'
+      description: 'Find a customer agent testtt who knows your market best'
     },
     {
       number: '03',
