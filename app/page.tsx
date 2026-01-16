@@ -5,6 +5,7 @@ import ConfidenceSection from '@/components/ConfidenceSection'
 import HotelPicksSection from '@/components/HotelPicksSection'
 import BlogSection from '@/components/BlogSection'
 import FAQSection from '@/components/FAQSection'
+import Footer from '@/components/Footer'
 
 export default function Home() {
   return (
@@ -16,6 +17,7 @@ export default function Home() {
       <HotelPicksSection />
       <BlogSection />
       <FAQSection />
+      <Footer />
     </main>
   )
 }
