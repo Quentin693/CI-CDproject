@@ -1,0 +1,181 @@
+---
+- name: Déploiement de l'application Stayava Hotel
+  hosts: all
+  become: yes
+  vars:
+    app_name: stayava-hotel
+    app_directory: /var/www/{{ app_name }}
+    node_version: "20.x"
+    app_port: 3000
+    
+  tasks:
+    # 1. Préparer l'environnement serveur
+    - name: 📦 Mise à jour des paquets système
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+    
+    - name: 📦 Installation des dépendances système
+      apt:
+        name:
+          - git
+          - curl
+          - build-essential
+          - nginx
+        state: present
+    
+    - name: 🔧 Ajout du repository NodeSource
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_{{ node_version }} | bash -
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+    
+    - name: 📦 Installation de Node.js
+      apt:
+        name: nodejs
+        state: present
+        update_cache: yes
+    
+    - name: 📦 Installation de PM2 globalement
+      npm:
+        name: pm2
+        global: yes
+        state: present
+    
+    # 2. Créer le répertoire de l'application
+    - name: 📁 Création du répertoire de l'application
+      file:
+        path: "{{ app_directory }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+    
+    # 3. Copier les fichiers de l'application
+    - name: 📤 Synchronisation du code source
+      synchronize:
+        src: "{{ playbook_dir }}/../"
+        dest: "{{ app_directory }}"
+        delete: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=node_modules"
+          - "--exclude=.next"
+          - "--exclude=ansible"
+          - "--exclude=.github"
+      delegate_to: localhost
+    
+    - name: 👤 Changement des permissions
+      file:
+        path: "{{ app_directory }}"
+        owner: www-data
+        group: www-data
+        recurse: yes
+    
+    # 4. Installer les dépendances
+    - name: 📦 Installation des dépendances npm
+      npm:
+        path: "{{ app_directory }}"
+        state: present
+        production: yes
+      become_user: www-data
+    
+    # 5. Build de l'application
+    - name: 🏗️ Build de l'application Next.js
+      command: npm run build
+      args:
+        chdir: "{{ app_directory }}"
+      environment:
+        NEXT_TELEMETRY_DISABLED: "1"
+        NODE_ENV: "{{ deploy_env }}"
+      become_user: www-data
+    
+    # 6. Configuration de PM2
+    - name: 📝 Création du fichier ecosystem.config.js pour PM2
+      copy:
+        dest: "{{ app_directory }}/ecosystem.config.js"
+        content: |
+          module.exports = {
+            apps: [{
+              name: '{{ app_name }}',
+              script: 'npm',
+              args: 'start',
+              cwd: '{{ app_directory }}',
+              instances: 2,
+              exec_mode: 'cluster',
+              autorestart: true,
+              watch: false,
+              max_memory_restart: '1G',
+              env: {
+                NODE_ENV: '{{ deploy_env }}',
+                PORT: {{ app_port }}
+              }
+            }]
+          }
+        owner: www-data
+        group: www-data
+        mode: '0644'
+    
+    # 7. Démarrer ou recharger le service
+    - name: 🔄 Arrêt de l'ancienne instance PM2 (si existe)
+      command: pm2 delete {{ app_name }}
+      ignore_errors: yes
+      become_user: www-data
+    
+    - name: 🚀 Démarrage de l'application avec PM2
+      command: pm2 start ecosystem.config.js
+      args:
+        chdir: "{{ app_directory }}"
+      become_user: www-data
+    
+    - name: 💾 Sauvegarde de la configuration PM2
+      command: pm2 save
+      become_user: www-data
+    
+    - name: ⚙️ Configuration de PM2 au démarrage
+      command: pm2 startup systemd -u www-data --hp /var/www
+      become: yes
+    
+    # 8. Configuration de Nginx
+    - name: 📝 Configuration de Nginx
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/sites-available/{{ app_name }}
+        mode: '0644'
+    
+    - name: 🔗 Activation du site Nginx
+      file:
+        src: /etc/nginx/sites-available/{{ app_name }}
+        dest: /etc/nginx/sites-enabled/{{ app_name }}
+        state: link
+    
+    - name: ❌ Suppression du site par défaut
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+    
+    - name: ✅ Test de la configuration Nginx
+      command: nginx -t
+      register: nginx_test
+    
+    - name: 🔄 Rechargement de Nginx
+      service:
+        name: nginx
+        state: reloaded
+      when: nginx_test.rc == 0
+    
+    # 9. Vérification du déploiement
+    - name: 🔍 Vérification que l'application répond
+      uri:
+        url: "http://localhost:{{ app_port }}"
+        status_code: 200
+        timeout: 30
+      retries: 5
+      delay: 10
+      register: result
+      until: result.status == 200
+    
+    - name: ✅ Déploiement terminé avec succès
+      debug:
+        msg: "🎉 L'application {{ app_name }} a été déployée avec succès en environnement {{ deploy_env }} !"
+

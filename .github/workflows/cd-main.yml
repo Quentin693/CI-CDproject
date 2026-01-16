@@ -1,0 +1,77 @@
+name: CD - Déploiement Production
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+      # 1. Checkout du code
+      - name: 📥 Checkout du code
+        uses: actions/checkout@v4
+      
+      # 2. Setup Node.js
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      # 3. Installation et build
+      - name: 📦 Installation des dépendances
+        run: npm ci
+      
+      - name: 🏗️ Build de l'application
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NODE_ENV: production
+      
+      # 4. Setup SSH pour Ansible
+      - name: 🔐 Configuration de la clé SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
+      
+      # 5. Installation d'Ansible
+      - name: 📦 Installation d'Ansible
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible
+      
+      # 6. Déploiement avec Ansible
+      - name: 🚀 Déploiement vers GCP (Production)
+        run: |
+          ansible-playbook -i ansible/inventory/production.ini ansible/playbook.yml \
+            --extra-vars "deploy_env=production"
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: False
+      
+      # 7. Création du tag de version (si c'est un tag)
+      - name: 🏷️ Création de la release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+      
+      # 8. Notification
+      - name: ✅ Déploiement réussi
+        if: success()
+        run: |
+          echo "✅ Déploiement vers la production réussi !"
+          echo "🌐 URL: http://${{ secrets.GCP_HOST }}"
+
