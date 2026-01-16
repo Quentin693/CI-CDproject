@@ -70,8 +70,7 @@ jobs:
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
           
-          ansible-playbook -i ansible/inventory/develop.ini ansible/playbook.yml \
-            --extra-vars "deploy_env=development" -vv
+          ansible-playbook -i ansible/inventory/develop.ini ansible/playbook-simple.yml -vv
         env:
           ANSIBLE_HOST_KEY_CHECKING: False
       

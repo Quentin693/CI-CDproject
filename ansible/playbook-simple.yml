@@ -1,0 +1,97 @@
+---
+- name: Déploiement Simple Stayava Hotel
+  hosts: all
+  become: yes
+  vars:
+    app_directory: /home/{{ ansible_user }}/stayava-hotel
+    
+  tasks:
+    # 1. Installer Node.js si pas installé
+    - name: 📦 Installation de Node.js
+      apt:
+        name: nodejs
+        state: present
+        update_cache: yes
+      ignore_errors: yes
+    
+    - name: 📦 Installation de npm
+      apt:
+        name: npm
+        state: present
+      ignore_errors: yes
+    
+    # 2. Créer le répertoire
+    - name: 📁 Créer le répertoire de l'application
+      file:
+        path: "{{ app_directory }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+    
+    # 3. Copier les fichiers avec copy au lieu de synchronize
+    - name: 📤 Copier les fichiers
+      copy:
+        src: "{{ playbook_dir }}/../"
+        dest: "{{ app_directory }}/"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: preserve
+      become_user: "{{ ansible_user }}"
+    
+    # 4. Supprimer node_modules et .next (clean)
+    - name: 🧹 Nettoyer node_modules et .next
+      file:
+        path: "{{ app_directory }}/{{ item }}"
+        state: absent
+      loop:
+        - node_modules
+        - .next
+      become_user: "{{ ansible_user }}"
+    
+    # 5. Installer les dépendances
+    - name: 📦 Installation des dépendances npm
+      command: npm install
+      args:
+        chdir: "{{ app_directory }}"
+      become_user: "{{ ansible_user }}"
+    
+    # 6. Build de l'application
+    - name: 🏗️ Build de l'application
+      command: npm run build
+      args:
+        chdir: "{{ app_directory }}"
+      environment:
+        NEXT_TELEMETRY_DISABLED: "1"
+      become_user: "{{ ansible_user }}"
+    
+    # 7. Tuer l'ancien processus npm start (si existe)
+    - name: 🛑 Arrêter l'ancien processus
+      shell: |
+        pkill -f "npm.*start" || true
+        pkill -f "node.*next.*start" || true
+      become_user: "{{ ansible_user }}"
+      ignore_errors: yes
+    
+    # 8. Démarrer l'application en arrière-plan
+    - name: 🚀 Démarrer l'application
+      shell: |
+        cd {{ app_directory }}
+        nohup npm start > /tmp/stayava.log 2>&1 &
+        sleep 3
+      become_user: "{{ ansible_user }}"
+    
+    # 9. Vérifier que l'app répond
+    - name: ✅ Vérifier que l'application répond
+      uri:
+        url: "http://localhost:3000"
+        status_code: 200
+      retries: 10
+      delay: 3
+      register: result
+      until: result.status == 200
+    
+    - name: 🎉 Déploiement terminé
+      debug:
+        msg: "Application déployée avec succès sur http://{{ ansible_host }}:3000"
+
