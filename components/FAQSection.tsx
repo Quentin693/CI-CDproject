@@ -10,7 +10,7 @@ export default function FAQSection() {
           Find your answers in our comprehensive FAQ section or reach out to our dedicated support team for assistance.
         </p>
         <button className="bg-gray-900 text-white px-8 py-4 rounded-full font-medium hover:bg-gray-800 transition">
-          Contact Support
+          Contact Support1111
         </button>
       </div>
     </section>
