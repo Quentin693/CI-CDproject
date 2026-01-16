@@ -21,11 +21,11 @@ export default function Header() {
 
           {/* Navigation */}
           <nav className="hidden md:flex items-center gap-8">
-            <a href="#home" className="text-white hover:text-gray-200 transition">Home</a>
-            <a href="#room" className="text-white hover:text-gray-200 transition">Room</a>
-            <a href="#facilities" className="text-white hover:text-gray-200 transition">Facilities</a>
-            <a href="#about" className="text-white hover:text-gray-200 transition">About us</a>
-            <a href="#contact" className="text-white hover:text-gray-200 transition">Contact</a>
+            <a href="#home" className="text-white hover:text-yellow-400 hover:underline transition">Accueil</a>
+            <a href="#room" className="text-white hover:text-yellow-400 hover:underline transition">Chambres</a>
+            <a href="#facilities" className="text-white hover:text-yellow-400 hover:underline transition">Équipements</a>
+            <a href="#about" className="text-white hover:text-yellow-400 hover:underline transition">À propos</a>
+            <a href="#contact" className="text-white hover:text-yellow-400 hover:underline transition">Contact</a>
           </nav>
 
           {/* CTA */}
@@ -34,8 +34,8 @@ export default function Header() {
               <Phone className="w-4 h-4" />
               <span className="text-sm">+01 782 7886 12</span>
             </div>
-            <button className="bg-white text-black px-6 py-2.5 rounded-full font-medium hover:bg-gray-100 transition">
-              Book your stay
+            <button className="bg-white text-black px-6 py-2.5 rounded-full font-medium hover:bg-yellow-400 hover:scale-105 transition-all duration-300">
+              Réserver
             </button>
           </div>
         </div>
