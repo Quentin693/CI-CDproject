@@ -34,9 +34,8 @@ yarn-error.log*
 next-env.d.ts
 
 # ansible
-ansible/inventory/*.ini
-!ansible/inventory/*.ini.example
 ansible/*.retry
+# Les fichiers inventory sont nécessaires pour le CD
 
 # SSH keys
 *.pub
