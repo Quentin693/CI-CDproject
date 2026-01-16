@@ -13,7 +13,7 @@ export default function HeroSection() {
           priority
         />
         {/* Overlay pour améliorer la lisibilité du texte */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/40" />
       </div>
 
       {/* Content */}
