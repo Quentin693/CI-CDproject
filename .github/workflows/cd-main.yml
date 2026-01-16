@@ -41,6 +41,19 @@ jobs:
           echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
+          
+          # Créer un fichier de config SSH
+          cat > ~/.ssh/config <<EOF
+          Host gcp-server
+            HostName ${{ secrets.GCP_HOST }}
+            User ${{ secrets.GCP_USERNAME }}
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
+          
+          # Test de connexion SSH
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.GCP_USERNAME }}@${{ secrets.GCP_HOST }} "echo 'SSH connection test OK'"
       
       # 5. Installation d'Ansible
       - name: 📦 Installation d'Ansible
