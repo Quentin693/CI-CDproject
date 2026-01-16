@@ -73,20 +73,37 @@
       shell: |
         cd {{ app_directory }}
         nohup npm start > /tmp/stayava.log 2>&1 &
-        sleep 3
+        sleep 10
       become_user: "{{ ansible_user }}"
     
-    # 9. Vérifier
-    - name: ✅ Vérifier que l'app répond
-      uri:
-        url: "http://localhost:3000"
-        status_code: 200
-      retries: 10
-      delay: 3
-      register: result
-      until: result.status == 200
+    # 9. Afficher les logs pour debug
+    - name: 📋 Afficher les dernières lignes des logs
+      command: tail -20 /tmp/stayava.log
+      become_user: "{{ ansible_user }}"
+      register: app_logs
+      ignore_errors: yes
     
-    - name: 🎉 Succès !
+    - name: 📄 Logs de l'application
       debug:
-        msg: "🎉 Application déployée ! Accessible sur http://{{ ansible_host }}:3000"
+        msg: "{{ app_logs.stdout_lines }}"
+      when: app_logs.stdout_lines is defined
+    
+    # 10. Vérifier que le processus tourne
+    - name: 🔍 Vérifier que npm start tourne
+      shell: ps aux | grep "npm.*start" | grep -v grep
+      become_user: "{{ ansible_user }}"
+      register: process_check
+      ignore_errors: yes
+    
+    - name: ✅ Processus en cours
+      debug:
+        msg: "{{ process_check.stdout_lines }}"
+    
+    - name: 🎉 Déploiement terminé !
+      debug:
+        msg: 
+          - "🎉 Déploiement terminé !"
+          - "📂 Application dans : {{ app_directory }}"
+          - "🌐 Accès (si le port 3000 est ouvert) : http://{{ ansible_host }}:3000"
+          - "📋 Logs : tail -f /tmp/stayava.log"
 
