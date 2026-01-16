@@ -18,7 +18,7 @@ export default function HotelPicksSection() {
         <div className="flex justify-between items-end mb-12">
           <div>
             <h2 className="text-5xl font-serif text-gray-900 mb-4">
-              Our Hotel Picks
+            Nos Hôtels Sélectionnés
             </h2>
             <p className="text-gray-600 max-w-2xl">
               At vestibulum pharetra leo nullam quis nibh pellentesque vestibulum. In massa, eu sed nunc massa ridiculus lacus quis purus commodo
