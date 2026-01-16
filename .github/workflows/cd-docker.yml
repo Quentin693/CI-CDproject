@@ -1,0 +1,144 @@
+name: 🐳 CD Docker - Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environnement de déploiement'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - develop
+
+jobs:
+  deploy-docker:
+    name: 🚀 Déploiement Docker
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: http://${{ secrets.GCP_HOST }}
+    
+    steps:
+      # 1. Checkout du code
+      - name: 📥 Checkout du code
+        uses: actions/checkout@v4
+      
+      # 2. Configuration SSH
+      - name: 🔐 Configuration SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
+      
+      # 3. Ajouter le host aux known_hosts
+      - name: 📝 Ajouter le host SSH
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
+      
+      # 4. Tester la connexion SSH
+      - name: 🔗 Test connexion SSH
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.GCP_USERNAME }}@${{ secrets.GCP_HOST }} "echo 'Connexion SSH réussie'"
+      
+      # 5. Installer Docker sur le serveur distant (si nécessaire)
+      - name: 🐳 Installer Docker sur le serveur
+        run: |
+          ssh ${{ secrets.GCP_USERNAME }}@${{ secrets.GCP_HOST }} << 'EOF'
+            # Vérifier si Docker est installé
+            if ! command -v docker &> /dev/null; then
+              echo "Installation de Docker..."
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              sudo usermod -aG docker $USER
+              rm get-docker.sh
+            fi
+            
+            # Vérifier si Docker Compose est installé
+            if ! command -v docker-compose &> /dev/null; then
+              echo "Installation de Docker Compose..."
+              sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+            fi
+            
+            echo "Docker version:"
+            docker --version
+            echo "Docker Compose version:"
+            docker-compose --version
+          EOF
+      
+      # 6. Copier les fichiers nécessaires sur le serveur
+      - name: 📤 Copier les fichiers sur le serveur
+        run: |
+          ssh ${{ secrets.GCP_USERNAME }}@${{ secrets.GCP_HOST }} "mkdir -p ~/stayava-hotel-docker"
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude '.next' \
+            --exclude 'coverage' \
+            --exclude '__tests__' \
+            ./ ${{ secrets.GCP_USERNAME }}@${{ secrets.GCP_HOST }}:~/stayava-hotel-docker/
+      
+      # 7. Build et démarrage des conteneurs Docker
+      - name: 🏗️ Build et démarrage Docker
+        run: |
+          ssh ${{ secrets.GCP_USERNAME }}@${{ secrets.GCP_HOST }} << 'EOF'
+            cd ~/stayava-hotel-docker
+            
+            # Arrêter et supprimer les anciens conteneurs
+            docker-compose down || true
+            
+            # Build l'image
+            docker-compose build --no-cache
+            
+            # Démarrer les conteneurs
+            docker-compose up -d
+            
+            # Afficher les logs
+            echo "Conteneurs en cours d'exécution:"
+            docker-compose ps
+          EOF
+      
+      # 8. Vérifier que l'application répond
+      - name: ✅ Vérifier le déploiement
+        run: |
+          ssh ${{ secrets.GCP_USERNAME }}@${{ secrets.GCP_HOST }} << 'EOF'
+            echo "Attente du démarrage de l'application..."
+            sleep 15
+            
+            # Vérifier que le conteneur tourne
+            if docker ps | grep -q "stayava-hotel-app"; then
+              echo "✅ Le conteneur est en cours d'exécution"
+            else
+              echo "❌ Le conteneur ne tourne pas"
+              docker-compose logs
+              exit 1
+            fi
+            
+            # Tester l'endpoint
+            if curl -f http://localhost:3000 > /dev/null 2>&1; then
+              echo "✅ L'application répond correctement"
+            else
+              echo "❌ L'application ne répond pas"
+              docker-compose logs
+              exit 1
+            fi
+          EOF
+      
+      # 9. Afficher les logs
+      - name: 📋 Afficher les logs
+        if: always()
+        run: |
+          ssh ${{ secrets.GCP_USERNAME }}@${{ secrets.GCP_HOST }} << 'EOF'
+            cd ~/stayava-hotel-docker
+            echo "=== Logs de l'application ==="
+            docker-compose logs --tail=50 app
+          EOF
+      
+      # 10. Notification de succès
+      - name: 🎉 Déploiement Docker réussi
+        run: |
+          echo "✅ Déploiement Docker terminé avec succès !"
+          echo "🌐 Application accessible sur: http://${{ secrets.GCP_HOST }}"
+

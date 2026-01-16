@@ -35,17 +35,26 @@ jobs:
         run: npm run lint
         continue-on-error: false
       
-      # 5. Tests unitaires (à ajouter si vous en avez)
-      # - name: 🧪 Tests unitaires
-      #   run: npm run test
+      # 5. Tests unitaires et coverage
+      - name: 🧪 Tests unitaires
+        run: npm run test:ci
       
-      # 6. Build
+      # 6. Upload coverage
+      - name: 📊 Upload coverage
+        if: matrix.node-version == '20.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage
+          retention-days: 7
+      
+      # 8. Build
       - name: 🏗️ Build de l'application
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: 1
       
-      # 7. Upload des artifacts
+      # 9. Upload des artifacts
       - name: 📤 Upload du build
         if: success() && matrix.node-version == '20.x'
         uses: actions/upload-artifact@v4
@@ -54,7 +63,7 @@ jobs:
           path: .next
           retention-days: 7
       
-      # 8. Notification de succès
+      # 10. Notification de succès
       - name: ✅ Build réussi
         if: success()
         run: echo "✅ Le build s'est terminé avec succès !"
