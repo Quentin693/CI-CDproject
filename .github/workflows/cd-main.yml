@@ -34,7 +34,7 @@ jobs:
           NEXT_TELEMETRY_DISABLED: 1
           NODE_ENV: production
       
-      # 4. Setup SSH pour Ansible
+      # 4. Setup SSH pour Ansible avec agent SSH
       - name: 🔐 Configuration de la clé SSH
         run: |
           mkdir -p ~/.ssh
@@ -42,13 +42,18 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
           
+          # Démarrer l'agent SSH
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+          
           # Créer un fichier de config SSH
           cat > ~/.ssh/config <<EOF
-          Host gcp-server
+          Host gcp-server ${{ secrets.GCP_HOST }}
             HostName ${{ secrets.GCP_HOST }}
             User ${{ secrets.GCP_USERNAME }}
             IdentityFile ~/.ssh/id_rsa
             StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
           EOF
           chmod 600 ~/.ssh/config
           
@@ -64,8 +69,12 @@ jobs:
       # 6. Déploiement avec Ansible
       - name: 🚀 Déploiement vers GCP (Production)
         run: |
+          # Réactiver l'agent SSH pour ansible
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+          
           ansible-playbook -i ansible/inventory/production.ini ansible/playbook.yml \
-            --extra-vars "deploy_env=production"
+            --extra-vars "deploy_env=production" -vv
         env:
           ANSIBLE_HOST_KEY_CHECKING: False
       
